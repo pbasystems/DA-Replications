@@ -112,7 +112,7 @@ def main():
     scores = np.array([r["score"] for r in results])
 
     print(f"\n{SOURCE_FD} -> {TARGET_FD} over {N_TRIALS} trials:")
-    print(f"RMSE:  {rmses.mean():.2f} +/- {rmses.std():.2f}   (paper LSTM-DANN: 48.62 +/- 6.83)")
+    print(f"RMSE:  {rmses.mean():.2f} +/- {rmses.std():.2f} ")
     print(f"Score: {scores.mean():.2f} +/- {scores.std():.2f}")
 
 
