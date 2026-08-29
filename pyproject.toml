@@ -22,7 +22,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/LSTM_DANN", "src/utils", "src/OPS_DANN", "src/pipelines"]
+packages = [
+    "src/lstm_dann",
+    "src/ops_dann",
+    "src/utils",
+    "src/pipelines",
+    "src/common",
+]
 
 [dependency-groups]
 dev = [

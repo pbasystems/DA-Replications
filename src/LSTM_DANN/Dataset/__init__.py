@@ -1,22 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from utils.types import FeatureStats
+
 OP_SETTING_COLS = [f"op_setting_{i}" for i in range(1, 4)]
 SENSOR_COLS = [f"sensor_{i}" for i in range(1, 22)]
 FEATURE_COLS = OP_SETTING_COLS + SENSOR_COLS
 COLUMN_NAMES = ["unit_number", "time_cycles", *FEATURE_COLS]
-
-
-class FeatureStats(NamedTuple):
-    min: np.ndarray
-    max: np.ndarray
 
 
 class CMAPSSDataset(Dataset):

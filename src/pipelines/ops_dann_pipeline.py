@@ -14,6 +14,7 @@ from ops_dann.Loss.Score import Score
 from ops_dann.Tester import Tester
 from ops_dann.Trainer import Trainer
 from src.pipelines.base import BasePipeline
+from utils.seed import seed_everything
 
 
 class OPSDANNPipeline(BasePipeline):
@@ -53,8 +54,7 @@ class OPSDANNPipeline(BasePipeline):
         target_dataset: NCMAPSSDataset,
         reporter: Any,
     ) -> dict[str, Any]:
-        torch.manual_seed(seed)
-        np.random.seed(seed)
+        seed_everything(seed)
 
         batch_size = self.cfg.dataset.batch_size
         shuffle = self.cfg.dataset.get("shuffle_train", True)
@@ -79,8 +79,8 @@ class OPSDANNPipeline(BasePipeline):
         rul_loss = RULLoss()
         domain_loss = DomainLoss()
         score_fn = Score(
-            alpha_over=loss_cfg.get("score_a1", 13.0),
-            alpha_under=loss_cfg.get("score_a2", 10.0),
+            alpha_over=loss_cfg.get("alpha_over", 1.0 / 10.0),
+            alpha_under=loss_cfg.get("alpha_under", 1.0 / 13.0),
         )
 
         trainer = Trainer(

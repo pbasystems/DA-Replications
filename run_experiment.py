@@ -13,6 +13,7 @@ from lstm_dann.Model import LSTM_DANN
 from lstm_dann.Tester import Tester
 from lstm_dann.Trainer import Trainer
 from utils.reporter import Reporter
+from utils.seed import seed_everything
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATASET_PATH = Path.cwd() / "Data" / "CMAPSS"
@@ -42,8 +43,7 @@ def last_window_per_engine(dataset):
 
 
 def run_trial(seed, source_dataset, target_dataset, target_test_dataloader):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    seed_everything(seed)
 
     source_dataloader = DataLoader(source_dataset, batch_size=256, shuffle=True)
     target_dataloader = DataLoader(target_dataset, batch_size=256, shuffle=True)

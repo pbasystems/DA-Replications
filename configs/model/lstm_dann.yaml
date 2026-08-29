@@ -1,4 +1,4 @@
-_target_: LSTM_DANN.Model.LSTM_DANN
+_target_: lstm_dann.Model.LSTM_DANN
 input_size: 24
 hidden_size: 64
 f_size: 32

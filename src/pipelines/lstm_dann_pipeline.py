@@ -16,6 +16,7 @@ from lstm_dann.Loss.Score import Score
 from lstm_dann.Tester import Tester
 from lstm_dann.Trainer import Trainer
 from src.pipelines.base import BasePipeline
+from utils.seed import seed_everything
 
 
 def compute_dataset_feature_stats(root_dir: str | Path, fd: str) -> FeatureStats:
@@ -98,8 +99,7 @@ class LSTMDANNPipeline(BasePipeline):
         target_test_dataloader: DataLoader,
         reporter: Any,
     ) -> dict[str, Any]:
-        torch.manual_seed(seed)
-        np.random.seed(seed)
+        seed_everything(seed)
 
         batch_size = self.cfg.dataset.batch_size
         shuffle = self.cfg.dataset.get("shuffle_train", True)

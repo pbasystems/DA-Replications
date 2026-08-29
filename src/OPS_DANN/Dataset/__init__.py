@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import NamedTuple
 
 import h5py
 import numpy as np
@@ -27,17 +26,14 @@ X_S_COLS = [
     "Nc",
     "Wf",
 ]
+from utils.types import FeatureStats
+
 FEATURE_COLS = W_COLS + X_S_COLS
 
 PHASE_ASCENDING = 0
 PHASE_STEADY = 1
 PHASE_DESCENDING = 2
 NUM_PHASES = 3
-
-
-class FeatureStats(NamedTuple):
-    min: np.ndarray
-    max: np.ndarray
 
 
 class NCMAPSSDataset(Dataset):

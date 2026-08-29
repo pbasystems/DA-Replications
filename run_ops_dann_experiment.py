@@ -11,6 +11,7 @@ from ops_dann.Model import OPSDANNHard
 from ops_dann.Tester import Tester
 from ops_dann.Trainer import Trainer
 from utils.reporter import Reporter
+from utils.seed import seed_everything
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 H5_PATH = Path.cwd() / "Data" / "NCMAPSS" / "N-CMAPSS_DS03-012.h5"
@@ -21,8 +22,7 @@ N_TRIALS = 10
 
 
 def run_trial(seed, source_dataset, target_dataset):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    seed_everything(seed)
 
     source_dataloader = DataLoader(source_dataset, batch_size=256, shuffle=True)
     target_dataloader = DataLoader(target_dataset, batch_size=256, shuffle=True)
