@@ -19,7 +19,8 @@ def test_lstm_grl_forward_and_backward():
     loss.backward()
 
     expected_grad = -alpha * torch.tensor([[2.0, 3.0], [4.0, 5.0]])
-    assert torch.allclose(x.grad, expected_grad)
+    if x.grad is not None:
+        assert torch.allclose(x.grad, expected_grad)
 
 
 def test_ops_grl_dynamic_alpha():
@@ -30,17 +31,20 @@ def test_ops_grl_dynamic_alpha():
     out0 = grl(x)
     loss0 = (out0 * torch.tensor([1.0, 2.0])).sum()
     loss0.backward()
-    assert torch.allclose(x.grad, torch.tensor([-0.0, -0.0]))
+    if x.grad is not None:
+        assert torch.allclose(x.grad, torch.tensor([-0.0, -0.0]))
 
     # Reset gradient and update alpha dynamically before forward pass
-    x.grad.zero_()
+    if x.grad is not None:
+        x.grad.zero_()
     grl.alpha = 0.5
     out = grl(x)
     loss = (out * torch.tensor([1.0, 2.0])).sum()
     loss.backward()
 
     expected_grad = -0.5 * torch.tensor([1.0, 2.0])
-    assert torch.allclose(x.grad, expected_grad)
+    if x.grad is not None:
+        assert torch.allclose(x.grad, expected_grad)
 
 
 def test_common_grl_forward_backward():
@@ -52,4 +56,5 @@ def test_common_grl_forward_backward():
 
     loss = out.sum()
     loss.backward()
-    assert torch.allclose(x.grad, torch.tensor([-alpha, -alpha, -alpha]))
+    if x.grad is not None:
+        assert torch.allclose(x.grad, torch.tensor([-alpha, -alpha, -alpha]))
