@@ -81,7 +81,9 @@ class NCMAPSSDataset(Dataset):
             targets.append(u_targets)
             phases.append(u_phases)
             unit_numbers.append(np.full(len(u_targets), unit, dtype=np.int64))
-            rul_scales.append(np.full(len(u_targets), unit_data["rul_onset"], dtype=np.float32))
+            rul_scales.append(
+                np.full(len(u_targets), unit_data["rul_onset"], dtype=np.float32)
+            )
 
         self.windows = np.concatenate(windows, axis=0)
         self.targets = np.concatenate(targets, axis=0)
@@ -116,7 +118,9 @@ class NCMAPSSDataset(Dataset):
 
             a_var = list(np.array(f["A_var"][:], dtype="U20"))
 
-        features = np.concatenate([w, xs], axis=1).astype(np.float32)  # FEATURE_COLS order
+        features = np.concatenate([w, xs], axis=1).astype(
+            np.float32
+        )  # FEATURE_COLS order
         idx = {name: a_var.index(name) for name in ("unit", "cycle", "Fc", "hs")}
         return {
             "features": features,
@@ -172,7 +176,9 @@ class NCMAPSSDataset(Dataset):
             phase_c[-1] = phase_c[-2]
 
             if len(phase_c) >= self.median_filter_length:
-                phase_c = median_filter(phase_c, size=self.median_filter_length, mode="nearest")
+                phase_c = median_filter(
+                    phase_c, size=self.median_filter_length, mode="nearest"
+                )
             phase[idx] = phase_c
 
         out = dict(data)
@@ -192,7 +198,9 @@ class NCMAPSSDataset(Dataset):
         out["rul_onset"] = rul_onset
         return out
 
-    def _build_unit_windows(self, data: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _build_unit_windows(
+        self, data: dict
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         w = self.window_size
         features = data["features"]
         rul = data["rul"]
@@ -205,7 +213,9 @@ class NCMAPSSDataset(Dataset):
                 [np.zeros((pad_len, features.shape[1]), dtype=np.float32), features]
             )
             rul = np.concatenate([np.full(pad_len, rul[0], dtype=rul.dtype), rul])
-            phase = np.concatenate([np.full(pad_len, phase[0], dtype=phase.dtype), phase])
+            phase = np.concatenate(
+                [np.full(pad_len, phase[0], dtype=phase.dtype), phase]
+            )
             n = len(features)
 
         n_steps = n - w
@@ -232,7 +242,9 @@ class NCMAPSSDataset(Dataset):
     def _normalize_features(self) -> None:
         span = self.feature_stats.max - self.feature_stats.min
         span = np.where(span == 0, 1.0, span)
-        self.windows = (2 * (self.windows - self.feature_stats.min) / span - 1).astype(np.float32)
+        self.windows = (2 * (self.windows - self.feature_stats.min) / span - 1).astype(
+            np.float32
+        )
 
     # ---- torch Dataset API --------------------------------------------------
 

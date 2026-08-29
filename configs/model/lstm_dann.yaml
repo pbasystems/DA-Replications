@@ -1,0 +1,9 @@
+_target_: LSTM_DANN.Model.LSTM_DANN
+input_size: 24
+hidden_size: 64
+f_size: 32
+num_layers: 1
+lstm_dropout: 0.5
+regressor_dropout: 0.3
+classifier_dropout: 0.3
+alpha: 0.8

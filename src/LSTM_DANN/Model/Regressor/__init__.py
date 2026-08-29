@@ -1,9 +1,10 @@
 import torch
-import torch.nn as nn
+from torch import nn
+
 
 class Regressor(nn.Module):
     def __init__(self, feature_size, hidden_size=32, dropout=0.3):
-        super(Regressor, self).__init__()
+        super().__init__()
         self.fc1 = nn.Linear(feature_size, hidden_size)
         self.activation = nn.ReLU()
         self.dropout = nn.Dropout(p=dropout)

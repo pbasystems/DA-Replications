@@ -102,7 +102,7 @@ class CMAPSSDataset(Dataset):
     def __len__(self) -> int:
         return len(self.targets)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
-        x = torch.from_numpy(self.windows[idx])
-        y = torch.tensor(self.targets[idx])
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        x = torch.from_numpy(self.windows[index])
+        y = torch.tensor(self.targets[index])
         return x, y

@@ -15,7 +15,7 @@ class TqdmLoggingHandler(logging.Handler):
             msg = self.format(record)
             tqdm.write(msg)
             self.flush()
-        except Exception:
+        except Exception:  # noqa: BLE001 - logging must never break the caller
             self.handleError(record)
 
 

@@ -1,8 +1,8 @@
 import torch
-import torch.nn as nn
+from torch import nn
+
 
 class Score(nn.Module):
-
     def __init__(self, a_1: float, a_2: float):
         super().__init__()
         self.a1 = a_1

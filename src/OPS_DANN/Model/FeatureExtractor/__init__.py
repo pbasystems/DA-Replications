@@ -1,9 +1,11 @@
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class FeatureExtractor(nn.Module):
-    def __init__(self, input_channels: int = 18, hidden_channels: int = 10, kernel_size: int = 10):
+    def __init__(
+        self, input_channels: int = 18, hidden_channels: int = 10, kernel_size: int = 10
+    ):
         super().__init__()
         pad_total = kernel_size - 1
         pad_left, pad_right = pad_total // 2, pad_total - pad_total // 2

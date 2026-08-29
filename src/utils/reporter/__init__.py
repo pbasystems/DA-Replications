@@ -12,7 +12,6 @@ except ImportError:  # wandb is an optional integration
 
 
 class Reporter:
-
     def __init__(
         self,
         name: str,
@@ -28,19 +27,24 @@ class Reporter:
 
         if self.use_wandb:
             if wandb is None:
-                self.logger.warning("wandb is not installed; continuing without wandb logging.")
+                self.logger.warning(
+                    "wandb is not installed; continuing without wandb logging."
+                )
                 self.use_wandb = False
             elif not wandb_project:
-                self.logger.warning("wandb_project not set; continuing without wandb logging.")
+                self.logger.warning(
+                    "wandb_project not set; continuing without wandb logging."
+                )
                 self.use_wandb = False
             else:
                 try:
                     self._run = wandb.init(
                         project=wandb_project, name=wandb_run_name, config=wandb_config
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - wandb init is best-effort
                     self.logger.warning(
-                        "Failed to initialise wandb run (%s); continuing without wandb logging.", exc
+                        "Failed to initialise wandb run (%s); continuing without wandb logging.",
+                        exc,
                     )
                     self.use_wandb = False
 
@@ -52,7 +56,7 @@ class Reporter:
         prefix = f"Step {step} - " if step is not None else ""
         self.logger.info("%s%s", prefix, formatted)
 
-        if self.use_wandb:
+        if self.use_wandb and wandb is not None:
             wandb.log(metrics, step=step)
 
     def info(self, msg: str, *args: Any) -> None:
@@ -62,5 +66,5 @@ class Reporter:
         self.logger.warning(msg, *args)
 
     def finish(self) -> None:
-        if self.use_wandb:
+        if self.use_wandb and wandb is not None:
             wandb.finish()

@@ -1,5 +1,4 @@
-import torch
-import torch.nn as nn
+from torch import nn
 from torch.autograd import Function
 
 """
@@ -9,6 +8,7 @@ https://github.com/tadeephuy/GradientReversal
 
 """
 
+
 class GradientReversalFn(Function):
     @staticmethod
     def forward(ctx, x, alpha):
@@ -16,14 +16,15 @@ class GradientReversalFn(Function):
         return x.view_as(x)
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output):  # ty: ignore[invalid-method-override]
         alpha = ctx.alpha
         grad_input = grad_output.neg() * alpha
         return grad_input, None
 
+
 class GradientReversal(nn.Module):
     def __init__(self, alpha=1.0):
-        super(GradientReversal, self).__init__()
+        super().__init__()
         self.alpha = alpha
 
     def forward(self, x):

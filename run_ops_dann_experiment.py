@@ -4,12 +4,12 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from OPS_DANN.Dataset import NCMAPSSDataset
-from OPS_DANN.Loss import DomainLoss, RULLoss
-from OPS_DANN.Loss.Score import Score
-from OPS_DANN.Model import OPSDANNHard
-from OPS_DANN.Tester import Tester
-from OPS_DANN.Trainer import Trainer
+from ops_dann.Dataset import NCMAPSSDataset
+from ops_dann.Loss import DomainLoss, RULLoss
+from ops_dann.Loss.Score import Score
+from ops_dann.Model import OPSDANNHard
+from ops_dann.Tester import Tester
+from ops_dann.Trainer import Trainer
 from utils.reporter import Reporter
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

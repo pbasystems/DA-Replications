@@ -1,6 +1,7 @@
 import torch
 from tqdm import tqdm
 
+from utils.reporter import Reporter
 
 
 def _clip_optimizer_grads(optimizer, max_norm=1.0):
@@ -9,9 +10,22 @@ def _clip_optimizer_grads(optimizer, max_norm=1.0):
 
 
 class Trainer:
-    def __init__(self, model, source_dataloader, target_dataloader, regression_optimizer, domain_optimizer,
-                 regression_scheduler, domain_scheduler, regression_loss, classification_loss, score_loss, device,
-                 max_grad_norm=1.0,reporter=None):
+    def __init__(
+        self,
+        model,
+        source_dataloader,
+        target_dataloader,
+        regression_optimizer,
+        domain_optimizer,
+        regression_scheduler,
+        domain_scheduler,
+        regression_loss,
+        classification_loss,
+        score_loss,
+        device,
+        max_grad_norm=1.0,
+        reporter: Reporter | None = None,
+    ):
         self.model = model
         self.source_dataloader = source_dataloader
         self.target_dataloader = target_dataloader
@@ -64,18 +78,31 @@ class Trainer:
             for source_batch, target_batch in classification_bar:
                 source_inputs, _ = source_batch
                 target_inputs, _ = target_batch
-                source_inputs, target_inputs = source_inputs.to(self.device), target_inputs.to(self.device)
+                source_inputs, target_inputs = (
+                    source_inputs.to(self.device),
+                    target_inputs.to(self.device),
+                )
 
                 self.domain_optimizer.zero_grad()
                 _, source_classification_outputs = self.model(source_inputs)
                 _, target_classification_outputs = self.model(target_inputs)
 
-                source_labels = torch.zeros(source_classification_outputs.size(0), 1).to(self.device)
-                target_labels = torch.ones(target_classification_outputs.size(0), 1).to(self.device)
+                source_labels = torch.zeros(
+                    source_classification_outputs.size(0), 1
+                ).to(self.device)
+                target_labels = torch.ones(target_classification_outputs.size(0), 1).to(
+                    self.device
+                )
 
-                source_classification_loss = self.classification_loss(source_classification_outputs, source_labels)
-                target_classification_loss = self.classification_loss(target_classification_outputs, target_labels)
-                classification_loss_value = source_classification_loss + target_classification_loss
+                source_classification_loss = self.classification_loss(
+                    source_classification_outputs, source_labels
+                )
+                target_classification_loss = self.classification_loss(
+                    target_classification_outputs, target_labels
+                )
+                classification_loss_value = (
+                    source_classification_loss + target_classification_loss
+                )
 
                 classification_loss_value.backward()
                 _clip_optimizer_grads(self.domain_optimizer, self.max_grad_norm)
@@ -83,7 +110,9 @@ class Trainer:
 
                 total_classification_loss += classification_loss_value.item()
                 n_batches += 1
-                classification_bar.set_postfix(loss=f"{classification_loss_value.item():.4f}")
+                classification_bar.set_postfix(
+                    loss=f"{classification_loss_value.item():.4f}"
+                )
 
             total_classification_loss /= n_batches
 
@@ -91,10 +120,11 @@ class Trainer:
                 self.regression_scheduler.step()
             if self.domain_scheduler is not None:
                 self.domain_scheduler.step()
-
-            self.reporter.log_metrics({
-                "epoch": epoch + 1,
-                "regression_loss": total_regression_loss,
-                "classification_loss": total_classification_loss,
-            })
- 
+            if self.reporter is not None:
+                self.reporter.log_metrics(
+                    {
+                        "epoch": epoch + 1,
+                        "regression_loss": total_regression_loss,
+                        "classification_loss": total_classification_loss,
+                    }
+                )

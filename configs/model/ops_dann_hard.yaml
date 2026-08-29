@@ -1,0 +1,3 @@
+_target_: OPS_DANN.Model.OPSDANNHard
+input_channels: 18
+num_phases: 3

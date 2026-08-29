@@ -1,10 +1,10 @@
 import torch
-import torch.nn as nn
+from torch import nn
 
-from OPS_DANN.Model.Classifier import Classifier
-from OPS_DANN.Model.FeatureExtractor import FeatureExtractor
-from OPS_DANN.Model.GRL import GradientReversal
-from OPS_DANN.Model.Regressor import Regressor
+from ops_dann.Model.Classifier import Classifier
+from ops_dann.Model.FeatureExtractor import FeatureExtractor
+from ops_dann.Model.GRL import GradientReversal
+from ops_dann.Model.Regressor import Regressor
 
 
 class OPSDANNHard(nn.Module):
@@ -12,10 +12,14 @@ class OPSDANNHard(nn.Module):
         super().__init__()
         self.feature_extractor = FeatureExtractor(input_channels)
         self.regressor = Regressor(input_size=50)
-        self.classifiers = nn.ModuleList([Classifier(input_size=50) for _ in range(num_phases)])
+        self.classifiers = nn.ModuleList(
+            [Classifier(input_size=50) for _ in range(num_phases)]
+        )
         self.grl = GradientReversal(alpha=0.0)
 
-    def forward(self, x: torch.Tensor, phase: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, phase: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         features = self.feature_extractor(x)
         rul = self.regressor(features)
 

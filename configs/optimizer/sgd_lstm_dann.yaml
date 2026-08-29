@@ -1,0 +1,5 @@
+lr_source_reg: 0.01
+lr_domain_class: 0.01
+l2_reg: 0.01
+scheduler_milestones: [100]
+scheduler_gamma: 0.1

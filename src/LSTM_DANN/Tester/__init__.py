@@ -18,7 +18,9 @@ class Tester:
 
         for inputs, labels in dataloader:
             inputs, labels = inputs.to(self.device), labels.to(self.device)
-            labels = labels.unsqueeze(1)  # (batch,) -> (batch, 1) to match regressor output
+            labels = labels.unsqueeze(
+                1
+            )  # (batch,) -> (batch, 1) to match regressor output
 
             regression_outputs, _ = self.model(inputs)
 

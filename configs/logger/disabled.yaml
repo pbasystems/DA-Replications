@@ -1,0 +1,6 @@
+name: disabled
+use_wandb: false
+wandb_project: null
+wandb_run_name: null
+wandb_config: null
+log_file: null

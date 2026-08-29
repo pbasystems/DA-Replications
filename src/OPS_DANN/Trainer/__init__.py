@@ -40,7 +40,9 @@ class Trainer:
             if mask.any():
                 losses.append(self.domain_loss(domain_pred[mask], domain_true[mask]))
         return (
-            torch.stack(losses).mean() if losses else torch.tensor(0.0, device=domain_pred.device)
+            torch.stack(losses).mean()
+            if losses
+            else torch.tensor(0.0, device=domain_pred.device)
         )
 
     def train(self, epochs: int):
@@ -64,7 +66,12 @@ class Trainer:
                 desc=f"Epoch {epoch + 1}/{epochs}",
                 leave=False,
             )
-            for (source_x, source_y, source_z, _), (target_x, target_y, target_z, _) in bar:
+            for (source_x, source_y, source_z, _), (
+                target_x,
+                target_y,
+                target_z,
+                _,
+            ) in bar:
                 source_x, source_y, source_z = (
                     source_x.to(self.device),
                     source_y.to(self.device),
@@ -104,7 +111,8 @@ class Trainer:
                 total_domain_loss += domain_loss_value.item()
                 global_step += 1
                 bar.set_postfix(
-                    rul=f"{rul_loss_value.item():.4f}", domain=f"{domain_loss_value.item():.4f}"
+                    rul=f"{rul_loss_value.item():.4f}",
+                    domain=f"{domain_loss_value.item():.4f}",
                 )
 
             total_rul_loss /= steps_per_epoch
