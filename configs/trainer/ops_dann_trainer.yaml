@@ -1,0 +1,4 @@
+epochs: 15
+tradeoff: 1.0
+num_phases: 3
+device: auto

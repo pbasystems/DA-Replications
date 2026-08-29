@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+  - override /dataset: cmapss
+  - override /model: lstm_dann
+  - override /trainer: lstm_dann_trainer
+  - override /optimizer: sgd_lstm_dann
+  - override /loss: lstm_dann_loss
+  - override /logger: console
+
+seed: 0
+trials: 10
+pipeline: lstm_dann
+task_name: 'lstm_dann_cmapss_10trials'

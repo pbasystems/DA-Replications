@@ -4,13 +4,14 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from OPS_DANN.Dataset import NCMAPSSDataset
-from OPS_DANN.Loss import DomainLoss, RULLoss
-from OPS_DANN.Loss.Score import Score
-from OPS_DANN.Model import OPSDANNHard
-from OPS_DANN.Tester import Tester
-from OPS_DANN.Trainer import Trainer
+from ops_dann.Dataset import NCMAPSSDataset
+from ops_dann.Loss import DomainLoss, RULLoss
+from ops_dann.Loss.Score import Score
+from ops_dann.Model import OPSDANNHard
+from ops_dann.Tester import Tester
+from ops_dann.Trainer import Trainer
 from utils.reporter import Reporter
+from utils.seed import seed_everything
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 H5_PATH = Path.cwd() / "Data" / "NCMAPSS" / "N-CMAPSS_DS03-012.h5"
@@ -21,8 +22,7 @@ N_TRIALS = 10
 
 
 def run_trial(seed, source_dataset, target_dataset):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    seed_everything(seed)
 
     source_dataloader = DataLoader(source_dataset, batch_size=256, shuffle=True)
     target_dataloader = DataLoader(target_dataset, batch_size=256, shuffle=True)

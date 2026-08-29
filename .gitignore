@@ -12,3 +12,7 @@ Data/NCMAPSS/
 wandb/
 
 .env
+
+# Hydra outputs
+outputs/
+multirun/

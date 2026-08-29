@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "h5py>=3.16.0",
+    "hydra-core>=1.3.2",
     "numpy>=2.5.2",
+    "omegaconf>=2.3.0",
     "pandas>=3.0.5",
     "python-dotenv>=1.2.3",
     "scipy>=1.18.1",
@@ -20,9 +22,20 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/LSTM_DANN", "src/utils", "src/OPS_DANN"]
+packages = [
+    "src/lstm_dann",
+    "src/ops_dann",
+    "src/utils",
+    "src/pipelines",
+    "src/common",
+]
 
 [dependency-groups]
 dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.5",
     "ty>=0.0.74",
 ]
+
+[tool.ty.environment]
+python = ".venv"

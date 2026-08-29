@@ -1,0 +1,5 @@
+# Paths configuration
+root_dir: ${oc.env:PROJECT_ROOT,.}
+data_dir: ${paths.root_dir}/Data
+output_dir: ${hydra:runtime.output_dir}
+work_dir: ${hydra:runtime.cwd}
