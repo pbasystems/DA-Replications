@@ -26,6 +26,8 @@ packages = ["src/LSTM_DANN", "src/utils", "src/OPS_DANN", "src/pipelines"]
 
 [dependency-groups]
 dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.5",
     "ty>=0.0.74",
 ]
 
