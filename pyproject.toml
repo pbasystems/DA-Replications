@@ -26,7 +26,6 @@ packages = ["src/LSTM_DANN", "src/utils", "src/OPS_DANN", "src/pipelines"]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.6.2",
     "ty>=0.0.74",
 ]
 
