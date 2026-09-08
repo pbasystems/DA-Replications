@@ -26,6 +26,7 @@ load_dotenv()
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATASET_PATH = Path.cwd() / "Data" / "CMAPSS"
+TEMP_DIR = Path.cwd() / "temp"
 os.environ["BASE_WORKING_DIR"] = str(Path.cwd())
 N_TRIALS = 1
 EPOCHS = 1
@@ -237,10 +238,12 @@ def main(cfg: DictConfig):
     print(f"RMSE:  {rmses.mean():.2f} +/- {rmses.std():.2f} ")
     print(f"MAE:   {maes.mean():.2f} +/- {maes.std():.2f}")
     print(f"Score: {scores.mean():.2f} +/- {scores.std():.2f}")
-    with open("results.csv", "a") as f:
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    with open(TEMP_DIR / "results.csv", "a") as f:
         f.write(
             f"{cfg.lstm_dann.source_fd},{cfg.lstm_dann.target_fd},{rmses.mean():.2f},{rmses.std():.2f},{maes.mean():.2f},{maes.std():.2f},{scores.mean():.2f},{scores.std():.2f}\n"
         )
+    print("Results saved to results.csv")
 
 
 if __name__ == "__main__":

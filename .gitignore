@@ -16,3 +16,4 @@ wandb/
 # Hydra outputs
 outputs/
 multirun/
+temp/
