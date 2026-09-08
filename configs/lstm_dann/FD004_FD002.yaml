@@ -1,20 +1,20 @@
-source_fd: "FD001"
+source_fd: "FD004"
 target_fd: "FD002"
 
-batch_size: 256
+batch_size: 512
 
 Model:
   input_size: 24
-  lstm_hidden_size: 128
-  f_size: 64
+  lstm_hidden_size: 100
+  f_size: 30
   num_layers: 1
   lstm_dropout: 0.5
-  regressor_dropout: 0.3
-  classifier_dropout: 0.3
-  alpha: 0.8
-  regressor_first_hidden_size: 32
+  regressor_dropout: 0.0
+  classifier_dropout: 0.1
+  alpha: 1.0
+  regressor_first_hidden_size: 20
   regressor_second_hidden_size: 0
-  classifier_first_hidden_size: 32
+  classifier_first_hidden_size: 20
   classifier_second_hidden_size: 0
 
 regularization: 0.01
