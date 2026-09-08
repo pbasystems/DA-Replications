@@ -1,9 +1,0 @@
-dataset_name: CMAPSS
-data_dir: ${paths.data_dir}/CMAPSS
-source_fd: FD001
-target_fd: FD002
-window_size: 30
-r_early: 125
-batch_size: 256
-shuffle_train: true
-combine_splits_for_stats: true

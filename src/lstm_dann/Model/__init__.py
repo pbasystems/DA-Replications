@@ -11,20 +11,34 @@ class LSTM_DANN(nn.Module):
     def __init__(
         self,
         input_size,
-        hidden_size,
+        lstm_hidden_size,
         f_size,
         num_layers,
         lstm_dropout=0.5,
         regressor_dropout=0.3,
         classifier_dropout=0.3,
         alpha=0.8,
+        regressor_first_hidden_size: int = 32,
+        regressor_second_hidden_size: int = 0,
+        classifier_first_hidden_size: int = 32,
+        classifier_second_hidden_size: int = 0,
     ):
         super().__init__()
         self.feature_extractor = FeatureExtractor(
-            input_size, hidden_size, f_size, num_layers, lstm_dropout
+            input_size, lstm_hidden_size, f_size, num_layers, lstm_dropout
         )
-        self.regressor = Regressor(f_size, dropout=regressor_dropout)
-        self.classifier = Classifier(f_size, dropout=classifier_dropout)
+        self.regressor = Regressor(
+            f_size,
+            regressor_first_hidden_size,
+            regressor_second_hidden_size,
+            dropout=regressor_dropout,
+        )
+        self.classifier = Classifier(
+            f_size,
+            classifier_first_hidden_size=classifier_first_hidden_size,
+            classifier_second_hidden_size=classifier_second_hidden_size,
+            dropout=classifier_dropout,
+        )
         self.grl = GradientReversal(alpha)
 
     def forward(self, x: torch.Tensor) -> tuple:
