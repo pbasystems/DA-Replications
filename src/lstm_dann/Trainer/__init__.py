@@ -1,6 +1,8 @@
 import torch
+from torch import nn
 from tqdm import tqdm
 
+from lstm_dann.EarlyStopper import EarlyStopping
 from utils.reporter import Reporter
 
 
@@ -13,8 +15,10 @@ class Trainer:
     def __init__(
         self,
         model,
-        source_dataloader,
-        target_dataloader,
+        source_train_dataloader,
+        source_val_dataloader,
+        target_train_dataloader,
+        target_val_dataloader,
         regression_optimizer,
         domain_optimizer,
         regression_scheduler,
@@ -24,11 +28,14 @@ class Trainer:
         score_loss,
         device,
         max_grad_norm=1.0,
+        early_stopper: EarlyStopping | None = None,
         reporter: Reporter | None = None,
     ):
         self.model = model
-        self.source_dataloader = source_dataloader
-        self.target_dataloader = target_dataloader
+        self.source_train_dataloader = source_train_dataloader
+        self.source_val_dataloader = source_val_dataloader
+        self.target_train_dataloader = target_train_dataloader
+        self.target_val_dataloader = target_val_dataloader
         self.regression_optimizer = regression_optimizer
         self.domain_optimizer = domain_optimizer
         self.regression_scheduler = regression_scheduler
@@ -39,15 +46,17 @@ class Trainer:
         self.device = device
         self.max_grad_norm = max_grad_norm
         self.reporter = reporter
+        self.mse_loss = nn.MSELoss()
+        self.early_stopper = early_stopper
 
     def train(self, epochs: int):
-        self.model.train()
         for epoch in range(epochs):
+            self.model.train()
             total_regression_loss = 0.0
             total_classification_loss = 0.0
 
             regression_bar = tqdm(
-                self.source_dataloader,
+                self.source_train_dataloader,
                 desc=f"Epoch {epoch + 1}/{epochs} [regression]",
                 leave=False,
             )
@@ -66,12 +75,14 @@ class Trainer:
                 total_regression_loss += regression_loss_value.item()
                 regression_bar.set_postfix(loss=f"{regression_loss_value.item():.4f}")
 
-            total_regression_loss /= len(self.source_dataloader)
+            total_regression_loss /= len(self.source_train_dataloader)
 
             n_batches = 0
             classification_bar = tqdm(
-                zip(self.source_dataloader, self.target_dataloader),
-                total=min(len(self.source_dataloader), len(self.target_dataloader)),
+                zip(self.source_train_dataloader, self.target_train_dataloader),
+                total=min(
+                    len(self.source_train_dataloader), len(self.target_train_dataloader)
+                ),
                 desc=f"Epoch {epoch + 1}/{epochs} [domain]",
                 leave=False,
             )
@@ -128,3 +139,38 @@ class Trainer:
                         "classification_loss": total_classification_loss,
                     }
                 )
+
+            validation_loss = self.validate()
+            if self.early_stopper is not None and self.early_stopper.step(
+                validation_loss, self.model
+            ):
+                if self.reporter is not None:
+                    self.reporter.info(f"Early stopping at epoch {epoch + 1}")
+                self.early_stopper.restore_best_weights(self.model)
+                break
+        # Restore best weights if the training loop completes without early stopping
+        if self.early_stopper is not None:
+            self.early_stopper.restore_best_weights(self.model)
+
+    def validate(self) -> None:
+        self.model.eval()
+        total_regression_loss = 0.0
+        regression_bar = tqdm(self.source_val_dataloader, leave=False)
+        with torch.no_grad():
+            for batch in regression_bar:
+                inputs, labels = batch
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                labels = labels.unsqueeze(1)
+
+                regression_outputs, _ = self.model(inputs)
+                regression_loss_value = torch.sqrt(
+                    self.mse_loss(regression_outputs, labels)
+                )
+
+                total_regression_loss += regression_loss_value.item()
+                regression_bar.set_postfix(loss=f"{regression_loss_value.item():.4f}")
+
+            total_regression_loss /= len(self.source_val_dataloader)
+            if self.reporter is not None:
+                self.reporter.log_metrics({"val_rmse": total_regression_loss})
+            return total_regression_loss
