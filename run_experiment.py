@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
+from dotenv import load_dotenv
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader, Subset
 
@@ -16,8 +18,11 @@ from lstm_dann.Trainer import Trainer
 from utils.reporter import Reporter
 from utils.seed import seed_everything
 
+load_dotenv()
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATASET_PATH = Path.cwd() / "Data" / "CMAPSS"
+os.environ["BASE_WORKING_DIR"] = str(Path.cwd())
 SOURCE_FD, TARGET_FD = "FD001", "FD002"
 N_TRIALS = 10
 EPOCHS = 200
@@ -124,7 +129,27 @@ def run_trial(
     domain_scheduler = MultiStepLR(domain_optimizer, milestones=[100], gamma=0.1)
 
     score_fn = Score(a_1=13, a_2=10)
-    reporter = Reporter(name=f"trial-{seed}", use_wandb=False)
+    reporter = Reporter(
+        name=f"LSTM_DANN.Experiments.{seed + 1}",
+        use_wandb=True,
+        wandb_project="DA-Replications|LSTM-DANN|CMAPSS",
+        wandb_run_name=f"FD001-to-FD002 | Trial {seed + 1}",
+        wandb_config={
+            "source_fd": "FD001",
+            "target_fd": "FD002",
+            "hidden_size": 64,
+            "f_size": 32,
+            "num_layers": 1,
+            "lstm_dropout": 0.5,
+            "regressor_dropout": 0.3,
+            "classifier_dropout": 0.3,
+            "alpha": 0.8,
+            "lr_source_reg": lr_source_reg,
+            "lr_domain_class": lr_domain_class,
+            "l2_reg": l2_reg,
+            "early_stopping_patience": 20,
+        },
+    )
 
     early_stopper = EarlyStopping(patience=20)
 
@@ -147,8 +172,10 @@ def run_trial(
     )
     trainer.train(epochs=EPOCHS)
 
-    tester = Tester(model=model, score_loss=score_fn, device=DEVICE)
-    return tester.evaluate(target_test_dataloader)
+    tester = Tester(model=model, score_loss=score_fn, device=DEVICE, reporter=reporter)
+    metrics = tester.evaluate(target_test_dataloader)
+    reporter.finish()
+    return metrics
 
 
 def main():

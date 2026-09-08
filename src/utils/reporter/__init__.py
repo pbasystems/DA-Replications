@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
+
+import torch
 
 from utils.logger import get_logger
 
@@ -24,6 +27,9 @@ class Reporter:
         self.logger = get_logger(name, log_file=log_file)
         self.use_wandb = use_wandb
         self._run = None
+        cwd = os.environ.get("BASE_WORKING_DIR", str(Path.cwd()))
+        self.temp_path = os.path.join(cwd, "temp")
+        os.makedirs(self.temp_path, exist_ok=True)
 
         if self.use_wandb:
             if wandb is None:
@@ -58,6 +64,18 @@ class Reporter:
 
         if self.use_wandb and wandb is not None:
             wandb.log(metrics, step=step)
+
+    def log_model(self, model: torch.nn.Module, step: int | None = None) -> None:
+        if self.use_wandb and wandb is not None:
+            torch.save(
+                model.state_dict(), os.path.join(self.temp_path, f"model_{step}.pth")
+            )
+            artifact = wandb.Artifact(name=f"model_{step}", type="model")
+            artifact.add_file(
+                local_path=os.path.join(self.temp_path, f"model_{step}.pth"),
+                name=f"model_{step}.pth",
+            )
+            wandb.log_artifact(artifact)
 
     def info(self, msg: str, *args: Any) -> None:
         self.logger.info(msg, *args)

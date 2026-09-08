@@ -2,12 +2,12 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 from dotenv import load_dotenv
 from torch import optim
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader, Subset
 
+import wandb
 from lstm_dann.Dataset import CMAPSSDataset
 from lstm_dann.Loss import ClassificationLoss, RegressionLoss
 from lstm_dann.Loss.Score import Score

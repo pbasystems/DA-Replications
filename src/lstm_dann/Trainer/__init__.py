@@ -76,7 +76,7 @@ class Trainer:
                 regression_bar.set_postfix(loss=f"{regression_loss_value.item():.4f}")
 
             total_regression_loss /= len(self.source_train_dataloader)
-
+            score = self.score_loss(regression_outputs, labels)
             n_batches = 0
             classification_bar = tqdm(
                 zip(self.source_train_dataloader, self.target_train_dataloader),
@@ -126,21 +126,19 @@ class Trainer:
                 )
 
             total_classification_loss /= n_batches
+            validation_loss, val_score = self.validate()
 
-            if self.regression_scheduler is not None:
-                self.regression_scheduler.step()
-            if self.domain_scheduler is not None:
-                self.domain_scheduler.step()
             if self.reporter is not None:
                 self.reporter.log_metrics(
                     {
                         "epoch": epoch + 1,
-                        "regression_loss": total_regression_loss,
-                        "classification_loss": total_classification_loss,
+                        "train/regression_loss": total_regression_loss,
+                        "train/score": score,
+                        "train/classification_loss": total_classification_loss,
+                        "val/regression_loss": validation_loss,
+                        "val/score": val_score,
                     }
                 )
-
-            validation_loss = self.validate()
             if self.early_stopper is not None and self.early_stopper.step(
                 validation_loss, self.model
             ):
@@ -148,6 +146,11 @@ class Trainer:
                     self.reporter.info(f"Early stopping at epoch {epoch + 1}")
                 self.early_stopper.restore_best_weights(self.model)
                 break
+            if self.regression_scheduler is not None:
+                self.regression_scheduler.step()
+            if self.domain_scheduler is not None:
+                self.domain_scheduler.step()
+
         # Restore best weights if the training loop completes without early stopping
         if self.early_stopper is not None:
             self.early_stopper.restore_best_weights(self.model)
@@ -155,9 +158,9 @@ class Trainer:
     def validate(self) -> None:
         self.model.eval()
         total_regression_loss = 0.0
-        regression_bar = tqdm(self.source_val_dataloader, leave=False)
+        # regression_bar = tqdm(self.source_val_dataloader, leave=False)
         with torch.no_grad():
-            for batch in regression_bar:
+            for batch in self.source_val_dataloader:
                 inputs, labels = batch
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 labels = labels.unsqueeze(1)
@@ -168,9 +171,11 @@ class Trainer:
                 )
 
                 total_regression_loss += regression_loss_value.item()
-                regression_bar.set_postfix(loss=f"{regression_loss_value.item():.4f}")
+                # regression_bar.set_postfix(loss=f"{regression_loss_value.item():.4f}")
 
             total_regression_loss /= len(self.source_val_dataloader)
-            if self.reporter is not None:
-                self.reporter.log_metrics({"val_rmse": total_regression_loss})
-            return total_regression_loss
+            score = self.score_loss(regression_outputs, labels)
+
+            # if self.reporter is not None:
+            #     self.reporter.log_metrics({"val_rmse": total_regression_loss})
+            return total_regression_loss, score
