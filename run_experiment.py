@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader, Subset
 
 from lstm_dann.Dataset import COLUMN_NAMES, FEATURE_COLS, CMAPSSDataset, FeatureStats
+from lstm_dann.EarlyStopper import EarlyStopping
 from lstm_dann.Loss import ClassificationLoss, RegressionLoss
 from lstm_dann.Loss.Score import Score
 from lstm_dann.Model import LSTM_DANN
@@ -20,6 +21,25 @@ DATASET_PATH = Path.cwd() / "Data" / "CMAPSS"
 SOURCE_FD, TARGET_FD = "FD001", "FD002"
 N_TRIALS = 10
 EPOCHS = 200
+
+
+def split_by_engine(dataset, val_ratio: float = 0.10, seed: int = 42):
+    """
+    Splits a CMAPSSDataset into train and validation subsets at the engine/unit level
+    to prevent temporal leakage across consecutive time windows of the same engine.
+    """
+    unique_units = np.unique(dataset.unit_numbers)
+    rng = np.random.RandomState(seed)
+    shuffled_units = rng.permutation(unique_units)
+
+    n_val = round(len(unique_units) * val_ratio)
+    val_units = set(shuffled_units[:n_val])
+    train_units = set(shuffled_units[n_val:])
+
+    train_indices = [i for i, u in enumerate(dataset.unit_numbers) if u in train_units]
+    val_indices = [i for i, u in enumerate(dataset.unit_numbers) if u in val_units]
+
+    return Subset(dataset, train_indices), Subset(dataset, val_indices)
 
 
 def compute_dataset_feature_stats(root_dir, fd):
@@ -42,11 +62,28 @@ def last_window_per_engine(dataset):
     return Subset(dataset, sorted(last_indices))
 
 
-def run_trial(seed, source_dataset, target_dataset, target_test_dataloader):
+def run_trial(
+    seed,
+    source_train_dataset,
+    source_val_dataset,
+    target_train_dataset,
+    target_val_dataset,
+    target_test_dataloader,
+):
     seed_everything(seed)
 
-    source_dataloader = DataLoader(source_dataset, batch_size=256, shuffle=True)
-    target_dataloader = DataLoader(target_dataset, batch_size=256, shuffle=True)
+    source_train_dataloader = DataLoader(
+        source_train_dataset, batch_size=256, shuffle=True
+    )
+    source_val_dataloader = DataLoader(
+        source_val_dataset, batch_size=256, shuffle=False
+    )
+    target_train_dataloader = DataLoader(
+        target_train_dataset, batch_size=256, shuffle=True
+    )
+    target_val_dataloader = DataLoader(
+        target_val_dataset, batch_size=256, shuffle=False
+    )
 
     model = LSTM_DANN(
         input_size=24,
@@ -89,18 +126,23 @@ def run_trial(seed, source_dataset, target_dataset, target_test_dataloader):
     score_fn = Score(a_1=13, a_2=10)
     reporter = Reporter(name=f"trial-{seed}", use_wandb=False)
 
+    early_stopper = EarlyStopping(patience=20)
+
     trainer = Trainer(
         model=model,
         regression_optimizer=regression_optimizer,
         domain_optimizer=domain_optimizer,
         regression_scheduler=regression_scheduler,
         domain_scheduler=domain_scheduler,
-        source_dataloader=source_dataloader,
-        target_dataloader=target_dataloader,
+        source_train_dataloader=source_train_dataloader,
+        target_train_dataloader=target_train_dataloader,
+        source_val_dataloader=source_val_dataloader,
+        target_val_dataloader=target_val_dataloader,
         regression_loss=RegressionLoss(p=1),
         classification_loss=ClassificationLoss(),
         score_loss=score_fn,
         device=DEVICE,
+        early_stopper=early_stopper,
         reporter=reporter,
     )
     trainer.train(epochs=EPOCHS)
@@ -137,6 +179,12 @@ def main():
         r_early=125,
         feature_stats=target_stats,
     )
+    source_train_subset, source_val_subset = split_by_engine(
+        source_dataset, val_ratio=0.10, seed=42
+    )
+    target_train_subset, target_val_subset = split_by_engine(
+        target_dataset, val_ratio=0.10, seed=42
+    )
     target_test_subset = last_window_per_engine(target_test_dataset)
     target_test_dataloader = DataLoader(
         target_test_subset, batch_size=len(target_test_subset), shuffle=False
@@ -145,7 +193,12 @@ def main():
     results = []
     for trial in range(N_TRIALS):
         metrics = run_trial(
-            trial, source_dataset, target_dataset, target_test_dataloader
+            seed=trial,
+            source_train_dataset=source_train_subset,
+            source_val_dataset=source_val_subset,
+            target_train_dataset=target_train_subset,
+            target_val_dataset=target_val_subset,
+            target_test_dataloader=target_test_dataloader,
         )
         print(
             f"Trial {trial + 1}/{N_TRIALS}: RMSE={metrics['rmse']:.2f}  MAE={metrics['mae']:.2f}  Score={metrics['score']:.2f}"
