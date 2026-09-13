@@ -16,3 +16,7 @@ wandb/
 # Hydra outputs
 outputs/
 multirun/
+temp/
+
+# Remove log files
+*.log

@@ -1,0 +1,25 @@
+source_fd: "FD003"
+target_fd: "FD004"
+
+batch_size: 256
+
+Model:
+  input_size: 24
+  # Table 3 specifies 2 layers with (64, 32) units. In PyTorch nn.LSTM with uniform hidden size, set to 64
+  lstm_hidden_size: 64
+  f_size: 64
+  num_layers: 2
+  lstm_dropout: 0.3
+  regressor_dropout: 0.1
+  classifier_dropout: 0.1
+  alpha: 2.0
+  regressor_first_hidden_size: 32
+  regressor_second_hidden_size: 32
+  classifier_first_hidden_size: 32
+  classifier_second_hidden_size: 32
+
+regularization: 0.01
+
+optimizer:
+  lr_source_reg: 0.01
+  lr_domain_class: 0.01

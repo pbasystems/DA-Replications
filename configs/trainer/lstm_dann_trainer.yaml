@@ -1,3 +1,0 @@
-epochs: 200
-max_grad_norm: 1.0
-device: auto

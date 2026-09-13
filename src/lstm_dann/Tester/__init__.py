@@ -1,11 +1,14 @@
 import torch
 
+from utils.reporter import Reporter
+
 
 class Tester:
-    def __init__(self, model, score_loss, device):
+    def __init__(self, model, score_loss, device, reporter: Reporter = None):
         self.model = model
         self.score_loss = score_loss
         self.device = device
+        self.reporter = reporter
 
     @torch.no_grad()
     def evaluate(self, dataloader):
@@ -30,6 +33,15 @@ class Tester:
             n_samples += labels.size(0)
 
         self.model.train()
+
+        if self.reporter:
+            self.reporter.log_metrics(
+                {
+                    "test/rmse": (total_sq_error / n_samples) ** 0.5,
+                    "test/mae": total_abs_error / n_samples,
+                    "test/score": total_score,
+                }
+            )
 
         return {
             "rmse": (total_sq_error / n_samples) ** 0.5,
