@@ -17,3 +17,6 @@ wandb/
 outputs/
 multirun/
 temp/
+
+# Remove log files
+*.log

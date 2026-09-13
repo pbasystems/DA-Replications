@@ -28,8 +28,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATASET_PATH = Path.cwd() / "Data" / "CMAPSS"
 TEMP_DIR = Path.cwd() / "temp"
 os.environ["BASE_WORKING_DIR"] = str(Path.cwd())
-N_TRIALS = 1
-EPOCHS = 1
+N_TRIALS = 10
+EPOCHS = 200
 
 
 def split_by_engine(dataset, val_ratio: float = 0.10, seed: int = 42):
@@ -78,7 +78,7 @@ def run_trial(
     target_test_dataloader,
     config: DictConfig,
 ):
-    seed_everything(config.seed)
+    seed_everything(seed)
 
     source_train_dataloader = DataLoader(
         source_train_dataset, batch_size=config.lstm_dann.batch_size, shuffle=True
@@ -175,7 +175,6 @@ def run_trial(
 
 @hydra.main(config_path="configs", config_name="config", version_base="1.1")
 def main(cfg: DictConfig):
-    seed_everything(cfg.seed)
     source_stats = compute_dataset_feature_stats(DATASET_PATH, cfg.lstm_dann.source_fd)
     target_stats = compute_dataset_feature_stats(DATASET_PATH, cfg.lstm_dann.target_fd)
 
