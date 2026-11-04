@@ -29,6 +29,7 @@ packages = [
     "src/pipelines",
     "src/common",
     "src/AdaBN",
+    "src/TTN",
 ]
 
 [dependency-groups]
