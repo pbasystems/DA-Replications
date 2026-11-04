@@ -320,7 +320,7 @@ def main():
             fd=fd,
             split="train",
             window_size=30,
-            max_rul=125,
+            r_early=125,
             feature_stats=stats,
         )
         test_ds = CMAPSSDataset(
@@ -328,7 +328,7 @@ def main():
             fd=fd,
             split="test",
             window_size=30,
-            max_rul=125,
+            r_early=125,
             feature_stats=stats,
         )
 

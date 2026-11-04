@@ -23,6 +23,7 @@ class CMAPSSDataset(Dataset):
         split: str = "train",
         window_size: int = 30,
         r_early: int = 125,
+        max_rul: int | None = None,
         feature_stats: FeatureStats | None = None,
     ) -> None:
         if split not in ("train", "test"):
@@ -32,7 +33,7 @@ class CMAPSSDataset(Dataset):
         self.fd = fd
         self.split = split
         self.window_size = window_size
-        self.r_early = r_early
+        self.r_early = max_rul if max_rul is not None else r_early
         file_path = self.root_dir / f"{split}_{fd}.txt"
         df = pd.read_csv(file_path, sep=r"\s+", header=None, names=COLUMN_NAMES)
         df["RUL"] = self._compute_rul(df)
@@ -49,56 +50,46 @@ class CMAPSSDataset(Dataset):
         if self.split == "train":
             return np.minimum(cycles_from_end, self.r_early)
 
-        final_rul = pd.read_csv(
-            self.root_dir / f"RUL_{self.fd}.txt", header=None, names=["RUL"]
-        )
-        final_rul.index = final_rul.index + 1  # unit numbers are 1-indexed
-        end_rul = df["unit_number"].map(final_rul["RUL"])
-        return np.minimum(cycles_from_end + end_rul, self.r_early)
+        rul_path = self.root_dir / f"RUL_{self.fd}.txt"
+        rul_series = pd.read_csv(rul_path, header=None).iloc[:, 0]
+        actual_rul_map = dict(zip(range(1, len(rul_series) + 1), rul_series))
+        return df["unit_number"].map(actual_rul_map) + cycles_from_end
 
     def _fit_feature_stats(self, df: pd.DataFrame) -> FeatureStats:
-        values = df[FEATURE_COLS].to_numpy()
-        return FeatureStats(min=values.min(axis=0), max=values.max(axis=0))
+        features = df[FEATURE_COLS].to_numpy()
+        return FeatureStats(min=features.min(axis=0), max=features.max(axis=0))
 
-    def _normalize(self, values: np.ndarray) -> np.ndarray:
+    def _normalize(self, features: np.ndarray) -> np.ndarray:
         span = self.feature_stats.max - self.feature_stats.min
-        span = np.where(span == 0, 1.0, span)
-        return (values - self.feature_stats.min) / span
+        span[span == 0] = 1.0
+        return (features - self.feature_stats.min) / span
 
     def _build_windows(
         self, df: pd.DataFrame
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        w = self.window_size
-        windows, targets, unit_numbers = [], [], []
+    ) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
+        windows: list[torch.Tensor] = []
+        targets: list[float] = []
+        unit_numbers: list[int] = []
 
-        for unit_number, group in df.groupby("unit_number", sort=True):
-            group = group.sort_values("time_cycles")
-            features = group[FEATURE_COLS].to_numpy(dtype=np.float32)
-            rul = group["RUL"].to_numpy(dtype=np.float32)
+        for unit_number, group in df.groupby("unit_number"):
+            features = group[FEATURE_COLS].to_numpy()
+            ruls = group["RUL"].to_numpy()
 
-            if len(features) <= w:
-                pad_len = w + 1 - len(features)
-                features = np.vstack(
-                    [np.zeros((pad_len, features.shape[1]), dtype=np.float32), features]
+            if len(features) < self.window_size:
+                continue
+
+            for start in range(len(features) - self.window_size + 1):
+                end = start + self.window_size
+                windows.append(
+                    torch.from_numpy(features[start:end]).float()
                 )
-                rul = np.concatenate([np.full(pad_len, rul[0], dtype=np.float32), rul])
+                targets.append(float(ruls[end - 1]))
+                unit_numbers.append(int(unit_number))
 
-            n_steps = len(features) - w
-            for t in range(w, w + n_steps):
-                windows.append(features[t - w : t])
-                targets.append(rul[t])
-                unit_numbers.append(unit_number)
-
-        return (
-            np.stack(windows),
-            np.array(targets, dtype=np.float32),
-            np.array(unit_numbers, dtype=np.int64),
-        )
+        return torch.stack(windows), torch.tensor(targets, dtype=torch.float32), unit_numbers
 
     def __len__(self) -> int:
-        return len(self.targets)
+        return len(self.windows)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        x = torch.from_numpy(self.windows[index])
-        y = torch.tensor(self.targets[index])
-        return x, y
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.windows[idx], self.targets[idx]
