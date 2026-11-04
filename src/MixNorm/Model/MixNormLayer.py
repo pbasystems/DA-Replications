@@ -150,9 +150,11 @@ def convert_bn_to_mixnorm(
     """
     Recursively replaces all nn.BatchNorm1d layers with MixNorm1d layers,
     preserving weights, biases, and source running statistics.
+    Ensures newly created MixNorm1d layers reside on the same device as the original layer.
     """
     for name, child in module.named_children():
         if isinstance(child, nn.BatchNorm1d):
+            device = child.running_mean.device
             mn = MixNorm1d(
                 num_features=child.num_features,
                 eps=child.eps,
@@ -160,7 +162,7 @@ def convert_bn_to_mixnorm(
                 affine=child.affine,
                 mixing_scale=mixing_scale,
                 moving_speed=moving_speed,
-            )
+            ).to(device)
             if child.affine:
                 mn.weight.data.copy_(child.weight.data)
                 mn.bias.data.copy_(child.bias.data)

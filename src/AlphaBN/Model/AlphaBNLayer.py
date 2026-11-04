@@ -5,11 +5,12 @@ from torch import nn
 
 class AlphaBN1d(nn.Module):
     """
-    Alpha-Batch Normalization (Alpha-BN) 1D Layer.
-    Reference: You, Li, Zhao, "Test-Time Batch Statistics Calibration for Covariate Shift", 2021.
+    Alpha-BN 1D Layer.
+    Reference: You et al., "Test-Time Batch Statistics Calibration for Covariate Shift", 2021.
     arXiv: 2110.04065.
 
-    Mixes source statistics and target batch statistics during inference via:
+    Calibrates test-time batch statistics by interpolating between source running statistics
+    and target mini-batch statistics:
       mu = alpha * mu_s + (1 - alpha) * mu_t
       sigma = alpha * sigma_s + (1 - alpha) * sigma_t
       x_hat = (x - mu) / (sigma + eps)
@@ -29,6 +30,8 @@ class AlphaBN1d(nn.Module):
         self.eps = eps
         self.momentum = momentum
         self.affine = affine
+        self.alpha = float(default_alpha)
+        self.mode = "alpha_bn"  # Options: 'cbn', 'tbn', 'alpha_bn'
 
         if affine:
             self.weight = nn.Parameter(torch.ones(num_features))
@@ -37,30 +40,31 @@ class AlphaBN1d(nn.Module):
             self.register_parameter("weight", None)
             self.register_parameter("bias", None)
 
+        # Source running statistics
         self.register_buffer("running_mean", torch.zeros(num_features))
         self.register_buffer("running_var", torch.ones(num_features))
         self.register_buffer("num_batches_tracked", torch.tensor(0, dtype=torch.long))
-
-        # Alpha hyperparameter in [0, 1]: weight for source statistics
-        # alpha = 1.0 -> Source (CBN)
-        # alpha = 0.0 -> T-BN (AdaBN)
-        self.alpha = float(default_alpha)
-        self.mode = "alpha_bn"  # 'source', 'tbn', 'alpha_bn'
 
     def set_alpha(self, alpha: float) -> None:
         if not (0.0 <= alpha <= 1.0):
             raise ValueError(f"alpha must be in [0, 1], got {alpha}")
         self.alpha = float(alpha)
+        if self.alpha == 1.0:
+            self.mode = "cbn"
+        elif self.alpha == 0.0:
+            self.mode = "tbn"
+        else:
+            self.mode = "alpha_bn"
 
     def set_mode(self, mode: str) -> None:
-        if mode not in ("source", "tbn", "alpha_bn"):
-            raise ValueError(f"Unknown mode {mode!r}. Must be 'source', 'tbn', or 'alpha_bn'.")
+        if mode not in ("cbn", "tbn", "alpha_bn"):
+            raise ValueError(f"Invalid mode: {mode}. Must be 'cbn', 'tbn', or 'alpha_bn'")
         self.mode = mode
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Expected input shape: (batch_size, num_features)
         if self.training:
-            # Standard Batch Normalization training pass on source domain
+            # Source training mode: standard Batch Normalization
             b_mean = x.mean(dim=0)
             b_var = x.var(dim=0, unbiased=False)
 
@@ -82,11 +86,11 @@ class AlphaBN1d(nn.Module):
             std = torch.sqrt(b_var + self.eps)
 
         else:
-            # Inference / Test time
+            # Test-time adaptation mode
             mu_s = self.running_mean
-            sigma_s = torch.sqrt(torch.clamp(self.running_var, min=0.0) + self.eps)
+            sigma_s = torch.sqrt(self.running_var + self.eps)
 
-            if self.mode == "source" or self.alpha == 1.0:
+            if self.mode == "cbn" or self.alpha == 1.0:
                 # Conventional Batch Normalization (Source statistics only)
                 mean = mu_s
                 std = sigma_s
@@ -121,16 +125,18 @@ def convert_bn_to_alpha_bn(module: nn.Module, default_alpha: float = 0.7) -> nn.
     """
     Recursively replaces all nn.BatchNorm1d layers with AlphaBN1d layers,
     preserving learned weights, biases, and source running statistics.
+    Ensures newly created AlphaBN1d layers reside on the same device as the original layer.
     """
     for name, child in module.named_children():
         if isinstance(child, nn.BatchNorm1d):
+            device = child.running_mean.device
             abn = AlphaBN1d(
                 num_features=child.num_features,
                 eps=child.eps,
                 momentum=child.momentum,
                 affine=child.affine,
                 default_alpha=default_alpha,
-            )
+            ).to(device)
             if child.affine:
                 abn.weight.data.copy_(child.weight.data)
                 abn.bias.data.copy_(child.bias.data)
