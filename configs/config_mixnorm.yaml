@@ -1,0 +1,6 @@
+defaults:
+  - _self_
+  - MixNorm: FD001_FD002
+
+seed: 42
+
