@@ -30,6 +30,7 @@ packages = [
     "src/common",
     "src/AdaBN",
     "src/TTN",
+    "src/AlphaBN",
 ]
 
 [dependency-groups]
