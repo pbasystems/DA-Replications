@@ -76,19 +76,19 @@ class AlphaBN1d(nn.Module):
                     exponential_average_factor = self.momentum
                 self.running_mean = (
                     1.0 - exponential_average_factor
-                ) * self.running_mean + exponential_average_factor * b_mean
+                ) * self.running_mean.to(x.device) + exponential_average_factor * b_mean
                 b_var_unbiased = x.var(dim=0, unbiased=True) if x.size(0) > 1 else b_var
                 self.running_var = (
                     1.0 - exponential_average_factor
-                ) * self.running_var + exponential_average_factor * b_var_unbiased
+                ) * self.running_var.to(x.device) + exponential_average_factor * b_var_unbiased
 
             mean = b_mean
             std = torch.sqrt(b_var + self.eps)
 
         else:
-            # Test-time adaptation mode
-            mu_s = self.running_mean
-            sigma_s = torch.sqrt(self.running_var + self.eps)
+            # Test-time adaptation mode (ensure running buffers reside on x.device)
+            mu_s = self.running_mean.to(x.device)
+            sigma_s = torch.sqrt(self.running_var.to(x.device) + self.eps)
 
             if self.mode == "cbn" or self.alpha == 1.0:
                 # Conventional Batch Normalization (Source statistics only)

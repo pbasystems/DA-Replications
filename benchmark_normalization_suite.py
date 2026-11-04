@@ -1,31 +1,11 @@
-"""
-Unified Benchmark Suite for Test-Time Normalization Methods on C-MAPSS.
-
-Evaluated Tasks:
-  1. FD002 -> FD001 (Multi-condition -> Single-condition)
-  2. FD004 -> FD003 (Multi-condition + 2 faults -> Single-condition + 2 faults)
-  3. FD004 -> FD002 (Multi-condition + 2 faults -> Multi-condition + 1 fault)
-  4. FD003 -> FD001 (Single-condition + 2 faults -> Single-condition + 1 fault)
-
-Evaluated Normalization Methods:
-  - Source Only (CBN - Conventional Batch Normalization)
-  - AdaBN / Pure T-BN (100% Target Batch Stats)
-  - Alpha-BN (alpha = 0.50)
-  - Alpha-BN (alpha = 0.20)
-  - TTN (Prior A from clean vs. augmented gradient distance)
-  - Mix-Norm (m = 0.10, Online Streaming EMA)
-  - Mix-Norm (m = 0.50, Online Streaming EMA)
-  - Target-Trained Oracle (Upper Bound: trained on target train split, tested on target)
-"""
-
 import argparse
 import copy
-import os
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
+from tabulate import tabulate
 from torch import nn, optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, Subset
@@ -103,6 +83,10 @@ def train_model_with_early_stopping(
     weight_decay: float = 0.01,
 ) -> nn.Module:
     model = model.to(device)
+    for m in model.modules():
+        if isinstance(m, nn.RNNBase):
+            m.flatten_parameters()
+
     optimizer = optim.SGD(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5, min_lr=1e-4)
     criterion = RegressionLoss(p=1)
@@ -113,6 +97,10 @@ def train_model_with_early_stopping(
     for epoch in range(1, max_epochs + 1):
         # 1. Training
         model.train()
+        for m in model.modules():
+            if isinstance(m, nn.RNNBase):
+                m.flatten_parameters()
+
         train_loss = 0.0
         train_samples = 0
         for x, y in train_loader:
@@ -159,12 +147,21 @@ def train_model_with_early_stopping(
             break
 
     early_stopper.restore_best_weights(model)
+    model = model.to(device)
+    for m in model.modules():
+        if isinstance(m, nn.RNNBase):
+            m.flatten_parameters()
     print(f"    Restored best model weights with Val RMSE = {early_stopper.best_score:.2f}\n")
     return model
 
 
 @torch.no_grad()
 def evaluate_predictions(model: nn.Module, dataloader: DataLoader, device: torch.device, score_fn: Score) -> dict[str, float]:
+    model = model.to(device)
+    for m in model.modules():
+        if isinstance(m, nn.RNNBase):
+            m.flatten_parameters()
+
     total_sq_error = 0.0
     total_abs_error = 0.0
     total_score = 0.0
@@ -186,13 +183,13 @@ def evaluate_predictions(model: nn.Module, dataloader: DataLoader, device: torch
 
 
 def evaluate_cbn(base_model: nn.Module, test_loader: DataLoader, device: torch.device, score_fn: Score) -> dict[str, float]:
-    model = copy.deepcopy(base_model)
+    model = copy.deepcopy(base_model).to(device)
     model.eval()
     return evaluate_predictions(model, test_loader, device, score_fn)
 
 
 def evaluate_adabn(base_model: nn.Module, test_loader: DataLoader, device: torch.device, score_fn: Score) -> dict[str, float]:
-    model = copy.deepcopy(base_model)
+    model = copy.deepcopy(base_model).to(device)
     model.eval()
     for m in model.modules():
         if isinstance(m, nn.BatchNorm1d):
@@ -203,6 +200,7 @@ def evaluate_adabn(base_model: nn.Module, test_loader: DataLoader, device: torch
 def evaluate_alpha_bn(base_model: nn.Module, test_loader: DataLoader, device: torch.device, score_fn: Score, alpha: float) -> dict[str, float]:
     model = copy.deepcopy(base_model)
     convert_bn_to_alpha_bn(model, default_alpha=alpha)
+    model = model.to(device)
     model.eval()
     for m in model.modules():
         if hasattr(m, "set_alpha"):
@@ -240,6 +238,7 @@ def evaluate_ttn(base_model: nn.Module, train_loader: DataLoader, test_loader: D
 def evaluate_mixnorm(base_model: nn.Module, test_loader: DataLoader, device: torch.device, score_fn: Score, mixing_scale: float) -> dict[str, float]:
     model = copy.deepcopy(base_model)
     convert_bn_to_mixnorm(model, mixing_scale=mixing_scale)
+    model = model.to(device)
     model.eval()
     for m in model.modules():
         if hasattr(m, "reset_online_stats"):
@@ -258,45 +257,56 @@ def main():
     parser.add_argument("--patience", type=int, default=15, help="Early stopping patience (epochs without validation improvement)")
     parser.add_argument("--batch_size", type=int, default=512, help="Batch size for training")
     parser.add_argument("--lr", type=float, default=0.01, help="Initial learning rate")
-    parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay")
+    parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay for SGD")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device (cuda or cpu)")
-    parser.add_argument("--output_csv", type=str, default="temp/benchmark_normalization_results.csv", help="Output CSV path")
+    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
+    parser.add_argument("--data_dir", type=str, default="Data/CMAPSS", help="Path to CMAPSS directory")
     args = parser.parse_args()
 
     seed_everything(args.seed)
     device = torch.device(args.device)
-    print(f"==================================================================")
-    print(f"   Test-Time Normalization Benchmark on C-MAPSS Turbofan RUL      ")
-    print(f"==================================================================")
-    print(f"Device: {device} | Max Epochs: {args.max_epochs} | Patience: {args.patience} | Batch Size: {args.batch_size} | Seed: {args.seed}\n")
 
-    root_dir = Path.cwd() / "Data" / "CMAPSS"
-    score_fn = Score(a_1=13.0, a_2=10.0)
-
+    data_dir = Path(args.data_dir)
     tasks = [
         ("FD002", "FD001", "FD002 -> FD001 (Multi-condition -> Single-condition)"),
-        ("FD004", "FD003", "FD004 -> FD003 (Multi-condition + 2 faults -> Single-cond + 2 faults)"),
-        ("FD004", "FD002", "FD004 -> FD002 (Multi-condition + 2 faults -> Multi-cond + 1 fault)"),
-        ("FD003", "FD001", "FD003 -> FD001 (Single-condition + 2 faults -> Single-cond + 1 fault)"),
+        ("FD004", "FD003", "FD004 -> FD003 (Multi-condition -> Single-condition)"),
+        ("FD001", "FD002", "FD001 -> FD002 (Single-condition -> Multi-condition)"),
+        ("FD003", "FD004", "FD003 -> FD004 (Single-condition -> Multi-condition)"),
     ]
 
-    all_domains = sorted(list({s for s, _, _ in tasks} | {t for _, t, _ in tasks}))
-    print(f"Domains needed across tasks: {all_domains}")
+    print("==================================================================")
+    print("   Test-Time Normalization Benchmark on C-MAPSS Turbofan RUL      ")
+    print("==================================================================")
+    print(f"Device: {device} | Max Epochs: {args.max_epochs} | Patience: {args.patience} | Batch Size: {args.batch_size} | Seed: {args.seed}\n")
 
-    # 1. Prepare Datasets & Dataloaders for all domains
-    domain_stats = {}
+    # 1. Precompute stats & build DataLoaders for each domain
+    all_domains = sorted(list({t[0] for t in tasks} | {t[1] for t in tasks}))
+    print(f"Domains needed across tasks: {all_domains}\n")
+
+    score_fn = Score()
     train_loaders = {}
     val_loaders = {}
     test_loaders = {}
 
-    print("\n--- Loading & Preprocessing C-MAPSS Datasets ---")
+    print("--- Loading & Preprocessing C-MAPSS Datasets ---")
     for fd in all_domains:
-        stats = compute_dataset_feature_stats(root_dir, fd)
-        domain_stats[fd] = stats
-
-        train_ds = CMAPSSDataset(root_dir=root_dir, fd=fd, split="train", window_size=30, r_early=125, feature_stats=stats)
-        test_ds = CMAPSSDataset(root_dir=root_dir, fd=fd, split="test", window_size=30, r_early=125, feature_stats=stats)
+        stats = compute_dataset_feature_stats(data_dir, fd)
+        train_ds = CMAPSSDataset(
+            root_dir=data_dir,
+            fd=fd,
+            split="train",
+            window_size=30,
+            max_rul=125,
+            feature_stats=stats,
+        )
+        test_ds = CMAPSSDataset(
+            root_dir=data_dir,
+            fd=fd,
+            split="test",
+            window_size=30,
+            max_rul=125,
+            feature_stats=stats,
+        )
 
         train_sub, val_sub = split_by_engine(train_ds, val_ratio=0.10, seed=args.seed)
         test_sub = last_window_per_engine(test_ds)
@@ -358,38 +368,45 @@ def main():
         results_map = {
             "Source Only (CBN)": res_cbn,
             "AdaBN / Pure T-BN": res_adabn,
-            "Alpha-BN (alpha=0.50)": res_abn_50,
-            "Alpha-BN (alpha=0.20)": res_abn_20,
+            "Alpha-BN (a=0.50)": res_abn_50,
+            "Alpha-BN (a=0.20)": res_abn_20,
             "TTN (Prior A)": res_ttn,
-            "Mix-Norm (m=0.10, EMA)": res_mn_10,
-            "Mix-Norm (m=0.50, EMA)": res_mn_50,
-            "Target Oracle (Upper Bound)": res_oracle,
+            "Mix-Norm (m=0.10)": res_mn_10,
+            "Mix-Norm (m=0.50)": res_mn_50,
+            "Target Oracle": res_oracle,
         }
 
-        print(f"{'Method / Configuration':<32} | {'RMSE':<8} | {'MAE':<8} | {'NASA Score':<12} | {'vs Source':<10}")
-        print("-" * 80)
-        base_rmse = res_cbn["rmse"]
-        for name, metrics in results_map.items():
-            diff = ((metrics['rmse'] - base_rmse) / base_rmse) * 100
-            diff_str = f"{diff:+.2f}%" if name != "Source Only (CBN)" else "Baseline"
-            print(f"{name:<32} | {metrics['rmse']:<8.2f} | {metrics['mae']:<8.2f} | {metrics['score']:<12.2f} | {diff_str:<10}")
-
+        # Print quick summary for current task
+        task_rows = []
+        for method_name, m_res in results_map.items():
+            task_rows.append([method_name, f"{m_res['rmse']:.2f}", f"{m_res['mae']:.2f}", f"{m_res['score']:.1f}"])
             records.append({
-                "source": src_fd,
-                "target": tgt_fd,
-                "task": f"{src_fd}->{tgt_fd}",
-                "method": name,
-                "rmse": metrics["rmse"],
-                "mae": metrics["mae"],
-                "score": metrics["score"],
-                "rmse_pct_change": diff,
+                "Task": task_desc.split(" (")[0],
+                "Method": method_name,
+                "RMSE": m_res["rmse"],
+                "MAE": m_res["mae"],
+                "Score": m_res["score"],
             })
 
-    # Save to CSV
-    os.makedirs(Path(args.output_csv).parent, exist_ok=True)
+        print(tabulate(task_rows, headers=["Method", "RMSE", "MAE", "Score"], tablefmt="simple_outline"))
+
+    # 4. Overall Benchmark Summary
     df_results = pd.DataFrame(records)
-    df_results.to_csv(args.output_csv, index=False)
-    print(f"\n[Done] All benchmark results successfully saved to: {args.output_csv}\n")
+    print("\n==================================================================")
+    print("                    FINAL BENCHMARK SUMMARY                       ")
+    print("==================================================================")
+
+    avg_df = df_results.groupby("Method")[["RMSE", "MAE", "Score"]].mean().reset_index()
+    # Sort with Oracle at the end, others by RMSE ascending
+    avg_df["sort_key"] = avg_df["Method"].apply(lambda m: 999 if m == "Target Oracle" else 0)
+    avg_df = avg_df.sort_values(by=["sort_key", "RMSE"]).drop(columns=["sort_key"])
+
+    print("\n--- Average Across All 4 Benchmark Tasks ---")
+    print(tabulate(avg_df.values, headers=avg_df.columns, floatfmt=".2f", tablefmt="github"))
+
+    out_csv = Path("benchmark_normalization_results.csv")
+    df_results.to_csv(out_csv, index=False)
+    print(f"\nSaved detailed results to {out_csv.resolve()}\n")
 
 
 if __name__ == "__main__":

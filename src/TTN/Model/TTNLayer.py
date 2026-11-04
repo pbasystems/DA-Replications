@@ -21,6 +21,7 @@ class TTN1d(nn.Module):
         eps: float = 1e-5,
         momentum: float = 0.1,
         affine: bool = True,
+        initial_alpha: float = 0.0,
     ):
         super().__init__()
         self.num_features = num_features
@@ -40,8 +41,9 @@ class TTN1d(nn.Module):
         self.register_buffer("running_var", torch.ones(num_features))
         self.register_buffer("num_batches_tracked", torch.tensor(0, dtype=torch.long))
 
-        # Channel-wise alpha parameter for test-time adaptation
-        self.register_buffer("alpha", torch.zeros(num_features))
+        # Channel-wise alpha parameter for test-time adaptation and Prior A
+        self.register_buffer("alpha", torch.full((num_features,), float(initial_alpha)))
+        self.register_buffer("prior_A", torch.full((num_features,), float(initial_alpha)))
         self.mode = "ttn"  # 'cbn', 'tbn', or 'ttn'
 
     def set_alpha(self, alpha: float | torch.Tensor) -> None:
@@ -62,10 +64,17 @@ class TTN1d(nn.Module):
         else:
             raise TypeError(f"alpha must be float or Tensor, got {type(alpha)}")
 
-    def set_ttn_mode(self, mode: str) -> None:
+    def set_prior(self, prior: torch.Tensor) -> None:
+        self.prior_A.copy_(prior.view_as(self.prior_A))
+        self.set_alpha(prior)
+
+    def set_mode(self, mode: str) -> None:
         if mode not in ("cbn", "tbn", "ttn"):
             raise ValueError(f"Invalid mode: {mode}. Must be 'cbn', 'tbn', or 'ttn'")
         self.mode = mode
+
+    def set_ttn_mode(self, mode: str) -> None:
+        self.set_mode(mode)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Expected input shape: (batch_size, num_features)
@@ -82,19 +91,19 @@ class TTN1d(nn.Module):
                     exponential_average_factor = self.momentum
                 self.running_mean = (
                     1.0 - exponential_average_factor
-                ) * self.running_mean + exponential_average_factor * b_mean
+                ) * self.running_mean.to(x.device) + exponential_average_factor * b_mean
                 b_var_unbiased = x.var(dim=0, unbiased=True) if x.size(0) > 1 else b_var
                 self.running_var = (
                     1.0 - exponential_average_factor
-                ) * self.running_var + exponential_average_factor * b_var_unbiased
+                ) * self.running_var.to(x.device) + exponential_average_factor * b_var_unbiased
 
             mean = b_mean
             var = b_var
 
         else:
-            # Test-time adaptation mode
-            mu_s = self.running_mean
-            var_s = self.running_var
+            # Test-time adaptation mode (ensure running buffers reside on x.device)
+            mu_s = self.running_mean.to(x.device)
+            var_s = self.running_var.to(x.device)
 
             if self.mode == "cbn":
                 # Conventional Batch Normalization (Source statistics only)
@@ -113,7 +122,7 @@ class TTN1d(nn.Module):
                 mu_t = x.mean(dim=0)
                 var_t = x.var(dim=0, unbiased=False) if x.size(0) > 1 else torch.zeros_like(mu_t)
 
-                a = self.alpha
+                a = self.alpha.to(x.device)
                 mean = a * mu_t + (1.0 - a) * mu_s
                 var = a * var_t + (1.0 - a) * var_s + a * (1.0 - a) * ((mu_t - mu_s) ** 2)
             else:

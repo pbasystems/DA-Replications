@@ -75,3 +75,17 @@ def test_convert_bn_to_alpha_bn():
     converted = convert_bn_to_alpha_bn(seq, default_alpha=0.7)
     assert isinstance(converted[1], AlphaBN1d)
     assert converted[1].alpha == 0.7
+
+
+def test_alpha_bn_device_safety():
+    num_features = 4
+    layer = AlphaBN1d(num_features=num_features, default_alpha=0.5)
+    layer.eval()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    layer = layer.to(device)
+    x = torch.randn(8, num_features, device=device)
+
+    out = layer(x)
+    assert out.shape == (8, num_features)
+    assert out.device == x.device

@@ -86,11 +86,11 @@ class MixNorm1d(nn.Module):
                     exponential_average_factor = self.momentum
                 self.running_mean = (
                     1.0 - exponential_average_factor
-                ) * self.running_mean + exponential_average_factor * b_mean
+                ) * self.running_mean.to(x.device) + exponential_average_factor * b_mean
                 b_var_unbiased = x.var(dim=0, unbiased=True) if x.size(0) > 1 else b_var
                 self.running_var = (
                     1.0 - exponential_average_factor
-                ) * self.running_var + exponential_average_factor * b_var_unbiased
+                ) * self.running_var.to(x.device) + exponential_average_factor * b_var_unbiased
 
                 # Sync global stats with running stats
                 self.global_mean.copy_(self.running_mean)
@@ -124,11 +124,11 @@ class MixNorm1d(nn.Module):
                     tau = self.moving_speed
 
                 with torch.no_grad():
-                    self.global_mean = (1.0 - tau) * self.global_mean + tau * b_mean
-                    self.global_var = (1.0 - tau) * self.global_var + tau * b_var
+                    self.global_mean = (1.0 - tau) * self.global_mean.to(x.device) + tau * b_mean
+                    self.global_var = (1.0 - tau) * self.global_var.to(x.device) + tau * b_var
 
-            mu_global = self.global_mean
-            sigma_global = self.global_var
+            mu_global = self.global_mean.to(x.device)
+            sigma_global = self.global_var.to(x.device)
 
             # Mix global and local statistics
             m = self.mixing_scale
