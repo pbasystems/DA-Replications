@@ -28,6 +28,7 @@ packages = [
     "src/utils",
     "src/pipelines",
     "src/common",
+    "src/AdaBN",
 ]
 
 [dependency-groups]
