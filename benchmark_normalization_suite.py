@@ -5,10 +5,34 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from tabulate import tabulate
 from torch import nn, optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, Subset
+
+try:
+    from tabulate import tabulate
+except ImportError:
+    def tabulate(tabular_data, headers=(), floatfmt=".2f", **kwargs):
+        headers = [str(h) for h in headers]
+        formatted_rows = []
+        for row in tabular_data:
+            formatted_row = []
+            for item in row:
+                if isinstance(item, (float, np.floating)):
+                    formatted_row.append(f"{float(item):{floatfmt}}")
+                else:
+                    formatted_row.append(str(item))
+            formatted_rows.append(formatted_row)
+        all_rows = [headers] + formatted_rows if headers else formatted_rows
+        col_widths = [max(len(str(item)) for item in col) for col in zip(*all_rows)]
+        lines = []
+        if headers:
+            header_line = " | ".join(h.ljust(w) for h, w in zip(headers, col_widths))
+            lines.append(header_line)
+            lines.append("-+-".join("-" * w for w in col_widths))
+        for row in formatted_rows:
+            lines.append(" | ".join(val.ljust(w) for val, w in zip(row, col_widths)))
+        return "\n".join(lines)
 
 from AdaBN.Dataset import COLUMN_NAMES, FEATURE_COLS, CMAPSSDataset, FeatureStats
 from AdaBN.EarlyStopper import EarlyStopping
